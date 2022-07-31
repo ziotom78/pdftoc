@@ -4,6 +4,9 @@ import std/os
 import std/strutils
 import std/strformat
 
+const NimblePkgVersion {.strdefine.} = "Unknown"
+const version = NimblePkgVersion
+
 const MAX_NEST_LEVEL = 20
 
 type
@@ -112,7 +115,7 @@ proc printDjvu(entries: seq[Entry]) =
 
 
 proc main() =
-  if paramCount() == 0 or paramCount() > 2:
+  if paramCount() == 0 or paramCount() > 2 or paramStr(1) in ["--help", "help", "-h"]:
     echo fmt"Usage: {getAppFileName()} FORMAT [FILE]"
     echo ""
     echo "FORMAT can either be 'pdftk', 'djvu':"
@@ -132,6 +135,10 @@ proc main() =
     echo ""
     echo "If FILE is not present, input will be read from terminal"
     quit(1)
+
+  if paramStr(1) in ["version", "--version", "-v"]:
+    echo version
+    quit(0)
     
   let outputFormatStr = paramStr(1)
   let inputFileName = if paramCount() > 1:
