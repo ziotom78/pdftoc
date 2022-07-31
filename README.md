@@ -17,6 +17,57 @@ and produce a text file that can be used with tools like [`pdftk`](https://www.p
 
 I wrote this code because I am slowly converting a number of handwritten notes to PDF and DJVU files, and I wanted to add a way to quickly navigate through them.
 
+
+## Compiling the code
+
+To compile the code, you will need the [Nim](https://nim-lang.org/) compiler. Run the following command to build the executable `pdfpc` (or `pdfpc.exe` if you are using Windows):
+
+    nimble build
+
+
+## Syntax of the input file
+
+The input file must be a UTF-8 encoded text file containing just one line per each bookmark. The last element in the line must be the page number, with the caveat that this is the *real* page number. (Some PDF files have aliases like `i`, `ii`, `iii`, `iv`, `v`… for the preliminary chapters: these won't work with `pdftoc`!).
+
+Indented lines mark a nested level of bookmarks; you must use spaces instead of tabulations, but you are free to use whatever level of indentation you want. For instance, you can use two spaces:
+
+```
+Title page 1
+First lesson (1998/03/01) 2
+  What is a fluid 2
+  Lagrangean and Eulerian frames 3
+    The Lagrangean frame 3
+    The Eulerian frame 4
+  The fluid equations 6
+```
+
+or four spaces:
+
+```
+Title page 1
+First lesson (1998/03/01) 2
+    What is a fluid 2
+    Lagrangean and Eulerian frames 3
+        The Lagrangean frame 3
+        The Eulerian frame 4
+    The fluid equations 6
+```
+
+or even use different indentation levels:
+
+```
+Title page 1
+First lesson (1998/03/01) 2
+ What is a fluid 2
+ Lagrangean and Eulerian frames 3
+             The Lagrangean frame 3
+             The Eulerian frame 4
+ The fluid equations 6
+```
+
+The result will be the same for all the three examples.
+
+
 ## Adding the TOC to a PDF file
 
 Be sure to have [`pdftk`](https://www.pdflabs.com/tools/pdftk-server/) installed on your system. Open a text editor, create a file named `toc.txt` and write the TOC as shown in the above example, then run `pdftoc`:
