@@ -11,3 +11,4 @@ bin           = @["pdftoc"]
 # Dependencies
 
 requires "nim >= 1.6.6"
+requires "therapist == 0.2"
