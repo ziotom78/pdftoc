@@ -24,6 +24,15 @@ To compile the code, you will need the [Nim](https://nim-lang.org/) compiler. Ru
 
     nimble build
 
+The executable can be copied anywhere, as it is a standalone binary. The usage is the following:
+
+    pdftoc pdftk input_file.pdf index_file.txt output_file.pdf
+    pdftoc djvu input_file.djvu index_file.txt output_file.djvu
+
+where the parameters `pdftk` or `djvu` are used to understand which tool to use. The input file is never changed. To get help about command-line options, call the executable without arguments:
+
+    pdftoc
+
 
 ## Syntax of the input file
 
@@ -66,31 +75,6 @@ First lesson (1998/03/01) 2
 ```
 
 The result will be the same for all the three examples.
-
-
-## Adding the TOC to a PDF file
-
-Be sure to have [`pdftk`](https://www.pdflabs.com/tools/pdftk-server/) installed on your system. Open a text editor, create a file named `toc.txt` and write the TOC as shown in the above example, then run `pdftoc`:
-
-    pdftoc pdftk toc.txt > toc.idx
-    
-Then, run [`pdftk`](https://www.pdflabs.com/tools/pdftk-server/) on your file:
-
-    pdftk myfile.pdf update_info_utf8 toc.idx output output_file.pdf
-    
-This will create a **new** file, `output_file.pdf`, which is the same as `myfile.pdf` but will be navigable.
-
-## Adding the TOC to a DJVU file
-
-You should have [`djvused`](http://djvu.sourceforge.net/doc/man/djvused.html) installed on your system. Open a text editor, create a file named `toc.txt` and write the TOC as shown in the above example, then run `pdftoc`:
-
-    pdftoc djvu toc.txt > toc.idx
-    
-Then, run [`djvused`](http://djvu.sourceforge.net/doc/man/djvused.html) on your file:
-
-    djvused myfile.djvu -e "set-outline toc.idx" -s
-    
-Be aware that, unlike [`pdftk`](https://www.pdflabs.com/tools/pdftk-server/) (see above), this command will **alter** `myfile.djvu`. If you want to play safe, better to copy your DJVU file and run [`djvused`](http://djvu.sourceforge.net/doc/man/djvused.html) on the copy; if the result looks ok, you can overwrite the original file with the copy.
 
 ## License
 
