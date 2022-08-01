@@ -1,11 +1,16 @@
 # -*- encoding: utf-8 -*-
 
 import std/os
+import std/osproc
+import std/tempfiles
 import std/strutils
 import std/strformat
 
+import therapist
+
 const NimblePkgVersion {.strdefine.} = "Unknown"
-const version = NimblePkgVersion
+const VERSION = NimblePkgVersion
+const LICENSE_TEXT = staticread(joinPath("..", "LICENSE.md"))
 
 const MAX_NEST_LEVEL = 20
 
@@ -14,7 +19,7 @@ type
     page : int
     name : string
     level : int
-  
+
 
 func countSpaces(s: string): int =
   result = 0
@@ -37,7 +42,7 @@ proc newEntry(strippedLine: string, level: int): Entry =
     stderr.writeLine("error, missing page number in line '", strippedLine, "'")
     quit(1)
 
-  
+
 proc processInput(inputFileName : string): seq[Entry] =
   var indentStack = newSeqOfCap[int](MAX_NEST_LEVEL)
   indentStack.add(0)
@@ -55,7 +60,7 @@ proc processInput(inputFileName : string): seq[Entry] =
     while true:
       let curLine = readline(inputFile)
       let cur_indent = countSpaces(curLine)
-      
+
       let stripped = curLine.strip()
       if stripped == "":
         continue
@@ -74,15 +79,19 @@ proc processInput(inputFileName : string): seq[Entry] =
     discard
 
 
-proc printPdfTk(entries: seq[Entry]) =
+proc printPdfTk(entries: seq[Entry], outputIndexFilePath: string) =
+  var outf = open(outputIndexFilePath, fmWrite)
+  defer:
+    outf.close()
+
   for entry in entries:
-    stdout.write "BookmarkBegin\n"
-    stdout.write "BookmarkTitle: ", entry.name, "\n"
-    stdout.write "BookmarkLevel: ", entry.level, "\n"
-    stdout.write "BookmarkPageNumber: ", entry.page, "\n"
+    outf.write "BookmarkBegin\n"
+    outf.write "BookmarkTitle: ", entry.name, "\n"
+    outf.write "BookmarkLevel: ", entry.level, "\n"
+    outf.write "BookmarkPageNumber: ", entry.page, "\n"
 
 
-proc printDjvu(entries: seq[Entry]) =
+proc printDjvu(entries: seq[Entry], outputIndexFilePath: string) =
 
   proc indent(level: int) =
     const INDENT_SPACES = 2
@@ -90,74 +99,112 @@ proc printDjvu(entries: seq[Entry]) =
 
   func escapeDjvu(s: string): string =
     result = multiReplace(s, ("\"", "\\\""))
-    
-  stdout.write "(bookmarks\n"
+
+  var outf = open(outputIndexFilePath, fmWrite)
+  defer:
+    outf.close()
+
+  outf.write "(bookmarks\n"
 
   for idx in 0..<len(entries):
     let entry = entries[idx]
-    
+
     indent(entry.level)
-    stdout.write "(\"", escapeDjvu(entry.name), "\" \"#", entry.page, '\"'
-    
+    outf.write "(\"", escapeDjvu(entry.name), "\" \"#", entry.page, '\"'
+
     if idx + 1 < len(entries):
       if entries[idx + 1].level <= entry.level:
-        stdout.write ")\n"
+        outf.write ")\n"
       else:
-        stdout.write '\n'
+        outf.write '\n'
 
       for j in countdown(entry.level - 1, entries[idx + 1].level):
         indent(j)
-        stdout.write ")\n"
+        outf.write ")\n"
     else:
-      stdout.write ")\n"
-      
-  stdout.write ")\n"
+      outf.write ")\n"
 
+  outf.write ")\n"
+
+
+let help = """
+Add a set of bookmarks to a PDF or DJVU file
+
+Usage:
+    pdftoc pdftk <input> <output>
+    pdftoc djvu <input> <output>
+    pdftoc help
+    pdftoc version
+
+Commands:
+    pdftk     Use `pdftk` to add the bookmarks to a PDF file
+    djvu      Use `djvused` to add the bookmarks to a DJVU file
+    help      Print this help
+    version   Print version information
+"""
+
+let pdftk = (
+  pdftkPath: newFileArg(@["--pdftk-path"], help = "Path to `pdftk`"),
+  inputPdfFile: newFileArg(@["<input_pdf>"], help = "Path to the input PDF file to process"),
+  indexFile: newFileArg(@["<index_file>"], help = "Text file containing the bookmarks"),
+  outputPdfFile: newStringArg(@["<output_pdf>"], help = "Path to the output PDF file that will be created"),
+  help: newHelpArg(@["-h", "--help"]),
+)
+
+let djvu = (
+  djvusedPath: newFileArg(@["--djvused-path"], help = "Path to `djvused`"),
+  inputDjvuFile: newFileArg(@["<input_djvu>"], help = "Path to the input DJVU file to process"),
+  indexFile: newFileArg(@["<index_file>"], help = "Text file containing the bookmarks"),
+  outputDjvuFile: newStringArg(@["<output_djvu>"], help = "Path to the output DJVU file that will be created"),
+  help: newHelpArg(@["-h", "--help"]),
+)
+
+let spec = (
+  pdftk: newCommandArg(@["pdftk"], pdftk, help="Use `pdftk` to add the bookmarks to a PDF file"),
+  djvu: newCommandArg(@["djvu"], djvu, help = "Use `djvused` to add bookmarks to a DJVU file"),
+  version: newMessageArg(@["-v", "--version"], VERSION, help = "Print version information"),
+  license: newMessageArg(@["--license"], LICENSE_TEXT, help = "Print license information"),
+  help: newHelpArg(@["-h", "--help"], help = "Print this help"),
+)
 
 proc main() =
-  if paramCount() == 0 or paramCount() > 2 or paramStr(1) in ["--help", "help", "-h"]:
-    echo fmt"Usage: {getAppFileName()} FORMAT [FILE]"
-    echo ""
-    echo "FORMAT can either be 'pdftk', 'djvu':"
-    echo "  - For 'pdftk', run the following command to add bookmarks to the PDF file:"
-    echo ""
-    echo "        pdftk INPUT.pdf update_info_utf8 FILE.txt output OUTPUT.pdf"
-    echo ""
-    echo "    where INPUT.pdf is the file to use as source, FILE.txt is the output"
-    echo "    of this program, and OUTPUT.pdf is the new file to create."
-    echo ""
-    echo "  - For 'djvu', run the following command to add bookmarks to the DJVU file:"
-    echo ""
-    echo "        djvused INPUT_OUTPUT.djvu -e \"set-outline FILE.txt\" -s"
-    echo ""
-    echo "    where INPUT_OUTPUT.djvu is the file to be modified in-place, and"
-    echo "    FILE.txt is the output of this program."
-    echo ""
-    echo "If FILE is not present, input will be read from terminal"
-    quit(1)
+  spec.parseOrHelp(prolog = "Add a set of bookmarks to a PDF or DJVU file")
 
-  if paramStr(1) in ["version", "--version", "-v"]:
-    echo version
-    quit(0)
-    
-  let outputFormatStr = paramStr(1)
-  let inputFileName = if paramCount() > 1:
-                        paramStr(2)
-                      else:
-                        ""
-  
-  let entries = processInput(inputFileName)
+  if spec.pdftk.seen:
+    let entries = processInput(pdftk.indexFile.value)
+    let pdftkScriptFile = genTempPath(prefix = "pdftk", suffix = ".idx")
+    let executable = if pdftk.pdftkPath.value != "":
+                       pdftk.pdftkPath.value
+                     else:
+                       "pdftk"
 
-  case outputFormatStr.toUpperAscii():
-    of "PDFTK":
-      printPdfTk(entries)
-    of "DJVU":
-      printDjvu(entries)
-    else:
-      stderr.write(fmt"unknown output format {outputFormatStr}")
-      quit(1)
-  
+    printPdfTk(entries, pdftkScriptFile)
+    defer:
+      os.removeFile(pdftkScriptFile)
 
-    
+    let result = osproc.execCmd(&""""{executable}" "{pdftk.inputPdfFile.value}" update_info_utf8 {pdftkScriptFile} output "{pdftk.outputPdfFile.value}"""")
+    if result != 0:
+      quit 2
+  elif spec.djvu.seen:
+    let entries = processInput(djvu.indexFile.value)
+    let djvuScriptFile = genTempPath(prefix = "djvused", suffix = ".idx")
+    let executable = if djvu.djvusedPath.value != "":
+                       djvu.djvusedPath.value
+                     else:
+                       "djvused"
+
+    printDjvu(entries, djvuScriptFile)
+    defer:
+      os.removeFile(djvuScriptFile)
+
+    os.copyFile(source = djvu.inputDjvuFile.value, dest = djvu.outputDjvuFile.value)
+
+    let result = execCmd(&""""{executable}" "{djvu.outputDjvuFile.value}" -e "set-outline {djvuScriptFile}" -s""")
+    if result != 0:
+      quit 2
+  else:
+    echo render_help(spec)
+
+
 when isMainModule:
   main()
